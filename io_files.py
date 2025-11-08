@@ -1,65 +1,62 @@
-# io_files.py
+# io_files.py — minimal, multi-drone only
+
 import csv
-from config import START_FILE, TARGETS_FILE, NFZS_FILE
+from config import TARGETS_FILE, NFZS_FILE, DRONES_FILE
 
 
-def load_start_pos():
-    """Reads drone.csv and returns (row, col). If anything fails, return (0,0)."""
+def _iter_clean_rows(path):
+    """Yield non-empty, non-comment CSV rows as lists of strings."""
     try:
-        with open(START_FILE, "r") as f:
-            reader = csv.reader(f)
-            for row in reader:
-                # Expect: row,col
-                parts = [x.strip() for x in row if x.strip() != ""]
-                if len(parts) == 2:
-                    return int(parts[0]), int(parts[1])
+        with open(path, "r") as f:
+            for row in csv.reader(f):
+                joined = "".join(row).strip()
+                if joined and not joined.startswith("#"):
+                    yield [x.strip() for x in row if x.strip()]
+    except Exception:
+        return  # stay silent per minimal-output rule
 
-        print("⚠️  drone.csv is empty or not formatted correctly. Using default (0,0).")
-        return (0, 0)
 
-    except:
-        print("⚠️  Could not read drone.csv. Using default (0,0).")
-        return (0, 0)
+def load_multi_starts(expected=None):
+    """
+    Read drones.csv -> [(r, c), ...]
+    Pads with the first start (or (0,0)) if fewer than `expected`.
+    """
+    starts = []
+    for parts in _iter_clean_rows(DRONES_FILE):
+        if len(parts) == 2:
+            try:
+                starts.append((int(parts[0]), int(parts[1])))
+            except ValueError:
+                pass
+
+    if expected is not None and len(starts) < expected:
+        filler = starts[0] if starts else (0, 0)
+        while len(starts) < expected:
+            starts.append(filler)
+    return starts
 
 
 def load_targets():
-    """Reads targets.csv and returns a list of (row, col). If problem, returns empty list."""
+    """Read targets.csv -> [(r, c), ...]"""
     targets = []
-    try:
-        with open(TARGETS_FILE, "r") as f:
-            reader = csv.reader(f)
-            for row in reader:
-                joined = "".join(row).strip()
-                if joined == "" or joined.startswith("#"):
-                    continue
-
-                parts = [x.strip() for x in row if x.strip() != ""]
-                if len(parts) == 2:
-                    targets.append((int(parts[0]), int(parts[1])))
-
-    except:
-        print("⚠️  Could not read targets.csv. No targets loaded.")
-
+    for parts in _iter_clean_rows(TARGETS_FILE):
+        if len(parts) == 2:
+            try:
+                targets.append((int(parts[0]), int(parts[1])))
+            except ValueError:
+                pass
     return targets
 
 
 def load_nfzs():
-    """Reads nfzs.csv and returns list of rectangles (r1,c1,r2,c2)."""
+    """Read nfzs.csv -> [(r1, c1, r2, c2), ...]"""
     nfzs = []
-    try:
-        with open(NFZS_FILE, "r") as f:
-            reader = csv.reader(f)
-            for row in reader:
-                joined = "".join(row).strip()
-                if joined == "" or joined.startswith("#"):
-                    continue
-
-                parts = [x.strip() for x in row if x.strip() != ""]
-                if len(parts) == 4:
-                    nfzs.append((int(parts[0]), int(parts[1]), int(parts[2]), int(parts[3])))
-
-    except:
-        print("⚠️  Could not read nfzs.csv. No NFZs loaded.")
-
+    for parts in _iter_clean_rows(NFZS_FILE):
+        if len(parts) == 4:
+            try:
+                r1, c1, r2, c2 = map(int, parts[:4])
+                nfzs.append((r1, c1, r2, c2))
+            except ValueError:
+                pass
     return nfzs
 

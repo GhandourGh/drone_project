@@ -1,118 +1,131 @@
-# visualize.py
+# visualize.py — multi-drone only (clean & simple)
+
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 from config import GRID_ROWS, GRID_COLS
 
 
 def enable_interactive():
-    """Enable interactive mode so the live plot updates."""
     plt.ion()
 
 
-def begin_live_map(start, targets, nfzs):
-    """Set up the plot and return a small 'state' dict you can update per step."""
+def _battery_layout_positions(n):
+    """Normalized (x, y) positions for n battery labels under the plot."""
+    if n <= 0:
+        return []
+    y = 0.02
+    if n == 1:
+        return [(0.5, y)]
+    xs = [0.1 + i * (0.8 / (n - 1)) for i in range(n)]
+    return [(x, y) for x in xs]
+
+
+def begin_live_map_multi(drone_starts, targets, nfzs):
+    """Set up multi-drone plot and return a state dict."""
     fig, ax = plt.subplots(figsize=(8, 8))
 
-    # Axes & grid styling (cell-like grid)
+    # Grid
     ax.set_xlim(-0.5, GRID_COLS - 0.5)
     ax.set_ylim(-0.5, GRID_ROWS - 0.5)
     ax.set_aspect('equal')
     ax.invert_yaxis()
     ax.set_xticks(range(GRID_COLS))
     ax.set_yticks(range(GRID_ROWS))
-    ax.set_xticks([x - 0.5 for x in range(GRID_COLS + 1)], minor=True)
-    ax.set_yticks([y - 0.5 for y in range(GRID_ROWS + 1)], minor=True)
-    ax.grid(True, which="major", linestyle="-", linewidth=1, alpha=0.35, color="#b5b5b5")
-    ax.grid(True, which="minor", linestyle=":", linewidth=0.5, alpha=0.18)
-
-    base_title = "Drone Map - Live Animation"
-    ax.set_title(base_title, fontsize=14, fontweight='bold')
+    ax.grid(True, linestyle=":", linewidth=0.5, alpha=0.5)
+    ax.set_title("Multi-Drone Animation")
     ax.set_xlabel("Columns")
     ax.set_ylabel("Rows")
-    ax.set_facecolor("#f9faff")
-    for spine in ax.spines.values():
-        spine.set_color("#b8c6d2")
-        spine.set_linewidth(1.2)
 
-    # Draw NFZs (semi-transparent red blocks)
+    # NFZ rectangles
     for (r1, c1, r2, c2) in nfzs:
         top, left = min(r1, r2), min(c1, c2)
         bot, right = max(r1, r2), max(c1, c2)
-        w = right - left + 1
-        h = bot - top + 1
         rect = plt.Rectangle(
-            (left - 0.5, top - 0.5), w, h,
-            fill=True, facecolor='red', alpha=0.3,
-            edgecolor='darkred', linewidth=2
+            (left - 0.5, top - 0.5),
+            right - left + 1, bot - top + 1,
+            facecolor="#e53935", alpha=0.25,
+            edgecolor="#b71c1c", linewidth=2
         )
         ax.add_patch(rect)
 
-    # Targets (blue stars)
+    # Targets
+    remaining_targets = set()
     if targets:
         t_rows = [r for r, _ in targets]
         t_cols = [c for _, c in targets]
-        ax.scatter(
-            t_cols, t_rows, s=300, c='blue', marker='*',
-            label='Targets', zorder=5, edgecolors='darkblue', linewidths=2
-        )
+        ax.scatter(t_cols, t_rows, s=300, c="#1976d2", marker="*",
+                   zorder=5, edgecolors="#0d47a1", linewidths=2)
+        remaining_targets = set(targets)
 
-    # Trail line + moving drone dot
-    line, = ax.plot([], [], 'g-', linewidth=3, label='Trail', zorder=3, alpha=0.7)
-    dot,  = ax.plot([], [], 'o', color='red', markersize=15,
-                    label='Drone', zorder=4, markeredgecolor='darkred', markeredgewidth=2)
-    ax.legend(loc='upper right', fontsize=10)
+    # Drone lines/dots (cycle colors if needed)
+    palette = [
+        ("#e53935", "#b71c1c"),
+        ("#43a047", "#1b5e20"),
+        ("#fbc02d", "#795548"),
+        ("#8e24aa", "#4a148c"),
+        ("#1976d2", "#0d47a1"),
+        ("#ffb300", "#f57c00"),
+    ]
+    drones = []
+    legend_handles = [
+        Patch(facecolor="#e53935", edgecolor="#b71c1c", alpha=0.25, label="NFZ"),
+        Line2D([0], [0], marker="*", linestyle="None",
+               markerfacecolor="#1976d2", markeredgecolor="#0d47a1",
+               markersize=12, label="Targets")
+    ]
 
-    # Seed with start
-    sr, sc = start
-    xs = [sc]
-    ys = [sr]
-    line.set_data(xs, ys)
-    dot.set_data([sc], [sr])
+    for i, (sr, sc) in enumerate(drone_starts):
+        lc, ec = palette[i % len(palette)]
+        line, = ax.plot([], [], "-", lw=3, color=lc, alpha=0.9, label=f"Drone {i+1}")
+        dot,  = ax.plot([], [], "o", ms=14, color=lc, markeredgecolor=ec, markeredgewidth=2)
+        line.set_data([sc], [sr])
+        dot.set_data([sc], [sr])
+        drones.append({"xs": [sc], "ys": [sr], "line": line, "dot": dot})
+        legend_handles.append(Line2D([0], [0], color=lc, lw=3, label=f"Drone {i+1}"))
 
-    # Force draw and show the initial plot
+    ax.legend(handles=legend_handles, loc="upper left", bbox_to_anchor=(1.04, 1),
+              fontsize=10, frameon=True)
+
     plt.draw()
-    plt.pause(0.5)  # Show initial state briefly
+    plt.pause(0.2)
 
-    # Track which targets remain to recolor when reached
-    remaining_targets = set(targets) if targets else set()
+    # Per-drone battery labels (under the plot)
+    battery_texts = []
+    for i, (x, y) in enumerate(_battery_layout_positions(len(drone_starts))):
+        battery_texts.append(fig.text(x, y, f"Drone {i+1} Battery: —",
+                                      ha="center", va="bottom", fontsize=10))
 
     return {
         "fig": fig, "ax": ax,
-        "line": line, "dot": dot,
-        "xs": xs, "ys": ys,
+        "drones": drones,
         "remaining_targets": remaining_targets,
-        "title_base": base_title,
+        "battery_texts": battery_texts,
     }
 
 
-def live_draw_step(state, pos, battery=None, pause_sec=0.2):
-    """Append pos to the trail and refresh the plot with animation.
-       If the drone steps on a target, recolor it purple.
-       If battery is provided, show it in the title."""
+def live_draw_step_multi(state, drone_index, pos, battery=None, pause_sec=0.02):
+    """Update one drone’s trail/dot and battery label; mark reached targets."""
     r, c = pos
-    state["xs"].append(c)
-    state["ys"].append(r)
-    state["line"].set_data(state["xs"], state["ys"])
-    state["dot"].set_data([c], [r])
+    d = state["drones"][drone_index]
 
-    # If current cell is a remaining target, mark it as reached (purple star)
-    if (r, c) in state.get("remaining_targets", set()):
-        state["ax"].plot(
-            c, r, marker="*", markersize=18,
-            color="purple", markeredgecolor="white", markeredgewidth=2,
-            zorder=6
-        )
+    d["xs"].append(c)
+    d["ys"].append(r)
+    d["line"].set_data(d["xs"], d["ys"])
+    d["dot"].set_data([c], [r])
+
+    if (r, c) in state["remaining_targets"]:
+        state["ax"].plot(c, r, marker="*", markersize=16, color="#8e24aa",
+                         markeredgecolor="white", markeredgewidth=2, zorder=6)
         state["remaining_targets"].remove((r, c))
 
-    # Update title with battery if available
-    if battery is not None:
-        state["ax"].set_title(f"{state['title_base']}  |  Battery: {battery} moves left")
+    if battery is not None and 0 <= drone_index < len(state["battery_texts"]):
+        state["battery_texts"][drone_index].set_text(f"Drone {drone_index+1} Battery: {battery}")
 
-    # Render and wait a bit
     plt.pause(pause_sec)
 
 
 def keep_plot_open():
-    """Keep the plot window open after animation completes."""
-    plt.ioff()  # turn off interactive mode
-    print("\n✅ Animation complete! Close the plot window to exit.")
-    plt.show()  # block and keep window open
+    plt.ioff()
+    print("\n✅ Animation complete! Close the window to exit.")
+    plt.show()

@@ -1,10 +1,12 @@
-# Simple constants (no OOP)
+# --- Grid ---
 GRID_ROWS = 20
 GRID_COLS = 20
 
-BATTERY_CAPACITY_STEPS = 200
+# --- Battery (moves per drone) ---
+BATTERY_CAPACITY_STEPS = 30
 
+# --- Data files ---
 DATA_DIR = "data"
-START_FILE = f"{DATA_DIR}/drone.csv"
-TARGETS_FILE = f"{DATA_DIR}/targets.csv"
-NFZS_FILE = f"{DATA_DIR}/nfzs.csv"
+TARGETS_FILE = f"{DATA_DIR}/targets.csv"   # list of (row,col)
+NFZS_FILE   = f"{DATA_DIR}/nfzs.csv"       # list of (r1,c1,r2,c2)
+DRONES_FILE = f"{DATA_DIR}/drones.csv"     # one start per line: r,c
