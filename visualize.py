@@ -1,5 +1,4 @@
 # visualize.py
-import time
 import matplotlib.pyplot as plt
 from config import GRID_ROWS, GRID_COLS
 
@@ -60,10 +59,8 @@ def begin_live_map(start, targets, nfzs):
     line.set_data(xs, ys)
     dot.set_data([sc], [sr])
 
-    # Make sure a real window appears and draws
-    fig.canvas.draw()
-    fig.canvas.flush_events()
-    plt.show(block=False)
+    # Show initial state with pause
+    plt.pause(0.5)
 
     return {"fig": fig, "ax": ax, "line": line, "dot": dot, "xs": xs, "ys": ys}
 
@@ -76,9 +73,12 @@ def live_draw_step(state, pos, pause_sec=0.08):
     state["line"].set_data(state["xs"], state["ys"])
     state["dot"].set_data([c], [r])
 
-    # Force redraw without relying on plt.pause (works better in IDEs)
-    state["fig"].canvas.draw()
-    state["fig"].canvas.flush_events()
+    # Use plt.pause for proper display updates
+    plt.pause(pause_sec)
 
-    # small sleep so motion is visible
-    time.sleep(pause_sec)
+
+def keep_plot_open():
+    """Keep the plot window open after animation completes."""
+    plt.ioff()  # turn off interactive mode
+    print("\n✅ Animation complete! Close the plot window to exit.")
+    plt.show()  # block and keep window open

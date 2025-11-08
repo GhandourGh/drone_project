@@ -4,7 +4,7 @@ from io_files import load_start_pos, load_targets, load_nfzs
 from grid_utils import build_nfz_mask, check_start_and_targets
 from movement_utils import valid_neighbors, choose_step_toward
 from config import GRID_ROWS, GRID_COLS
-from visualize import begin_live_map, live_draw_step, enable_interactive
+from visualize import begin_live_map, live_draw_step, enable_interactive, keep_plot_open
 from navigator import visit_targets_in_order
 
 
@@ -62,6 +62,9 @@ def main():
 
     print(f"Final position: {final_pos}")
     print(f"Total path length (including start): {len(full_path)}")
+
+    # Keep the plot window open after animation completes
+    keep_plot_open()
 
 
 if __name__ == "__main__":
