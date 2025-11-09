@@ -19,7 +19,7 @@ def run_multi_drones():
     live = begin_live_map_multi(starts, targets, nfzs)
 
     def on_step(drone_idx, position, battery):
-        live_draw_step_multi(live, drone_idx, position, battery=battery, pause_sec=0.02)
+        live_draw_step_multi(live, drone_idx, position, battery=battery, pause_sec=0.01)
 
     max_steps_per_target = GRID_ROWS * GRID_COLS * 2
     battery_each = BATTERY_CAPACITY_STEPS
